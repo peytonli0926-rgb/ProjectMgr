@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>文件脱敏工作台</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="productShell">
+    <aside class="sidebar">
+      <div class="sideBrand">
+        <div class="logoMark">DS</div>
+        <div>
+          <strong>Data Shield</strong>
+          <span>Local Redaction Console</span>
+        </div>
+      </div>
+
+      <nav class="navGroups" aria-label="产品导航">
+        <details class="navGroup" open>
+          <summary><span>工作台</span><i></i></summary>
+          <button class="navItem active" data-panel="workbench">扫描与脱敏</button>
+          <button class="navItem" data-panel="progress">执行进度</button>
+          <button class="navItem" data-panel="results">扫描结果</button>
+        </details>
+        <details class="navGroup" open>
+          <summary><span>规则中心</span><i></i></summary>
+          <button class="navItem" data-panel="rules">脱敏规则</button>
+          <button class="navItem" data-panel="scope">文件范围</button>
+        </details>
+        <details class="navGroup" open>
+          <summary><span>报告生成</span><i></i></summary>
+          <button class="navItem" data-panel="report-generator">统一报告生成</button>
+        </details>
+        <details class="navGroup">
+          <summary><span>审计与安全</span><i></i></summary>
+          <button class="navItem" data-panel="report">报告说明</button>
+          <button class="navItem" data-panel="risk">风险提示</button>
+        </details>
+      </nav>
+
+      <div class="sideFoot">
+        <span class="safeDot"></span>
+        <div>
+          <strong>本地处理</strong>
+          <p>文件不上传，源文件不修改。</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">文件脱敏工作台</p>
+          <h1 id="pageTitle">扫描、识别并生成安全脱敏副本</h1>
+          <p class="subtitle" id="pageSubtitle">输入本机目录后先扫描文件数量和类型，确认后再创建同级 <b>_desensitized</b> 目录。</p>
+        </div>
+        <div class="heroBadges">
+          <span>本地处理</span>
+          <span>不上传文件</span>
+          <span>源文件不修改</span>
+        </div>
+      </header>
+
+      <section class="mainGrid">
+        <div class="primaryColumn">
+          <section class="card panel activePanel" id="panel-workbench">
+            <div class="steps">
+              <div class="step active" id="stepInput"><b>1</b><span>指定目录</span></div>
+              <div class="step" id="stepScan"><b>2</b><span>扫描文件</span></div>
+              <div class="step" id="stepRun"><b>3</b><span>确认脱敏</span></div>
+            </div>
+
+            <label for="sourceDir">源目录路径</label>
+            <div class="inputRow">
+              <input id="sourceDir" placeholder="例如 /Users/peyton/Desktop/test_files" />
+              <button class="secondary" onclick="scan()">扫描文件</button>
+              <button id="startBtn" onclick="startJob()" disabled>确认后开始脱敏</button>
+            </div>
+            <p class="hint">扫描动作不会创建目录，也不会修改文件；确认脱敏后才会生成目标目录。</p>
+
+            <div class="metrics">
+              <div class="metric"><b id="total">0</b><span>可处理文件</span></div>
+              <div class="metric"><b id="processed">0</b><span>已处理</span></div>
+              <div class="metric"><b id="skipped">0</b><span>跳过文件</span></div>
+              <div class="metric"><b id="failed">0</b><span>失败文件</span></div>
+            </div>
+          </section>
+
+          <section class="card panel" id="panel-progress">
+            <div class="sectionTitle">
+              <h2>执行进度</h2>
+              <span id="statusBadge" class="tag neutral">等待扫描</span>
+            </div>
+            <div class="progress"><div id="bar"></div></div>
+            <div class="statusGrid">
+              <div><b>状态</b><span id="status">等待输入目录并扫描</span></div>
+              <div><b>目标目录</b><span id="targetDir">-</span></div>
+              <div><b>当前文件</b><span id="currentFile">-</span></div>
+            </div>
+            <div class="typeCounts" id="typeCounts"><span class="pill">等待扫描统计</span></div>
+          </section>
+
+          <section class="card panel" id="panel-results">
+            <div class="sectionTitle">
+              <h2>扫描结果</h2>
+              <span class="muted" id="tableSummary">暂无扫描结果</span>
+            </div>
+            <div class="panelActions">
+              <button class="secondary" onclick="activatePanel('workbench')">返回配置</button>
+              <button id="resultStartBtn" onclick="startJob()" disabled>确认后开始脱敏</button>
+            </div>
+            <div class="tableWrap">
+              <table>
+                <thead><tr><th>文件</th><th>类型</th><th>状态</th><th>说明</th></tr></thead>
+                <tbody id="fileRows"><tr><td colspan="4" class="muted">扫描后会显示文件明细。</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card panel" id="panel-report-generator">
+            <div class="sectionTitle"><h2>统一报告生成</h2><span class="tag">已接入</span></div>
+            <div class="reportBuilder">
+              <div class="reportHero"><b>Report Studio</b><span>一次指定台账数据源和交付文档目录，按日期范围生成周报、月报、季度报或年度报告。</span></div>
+
+              <label for="reportLedgerPath">Excel 台账路径</label>
+              <input id="reportLedgerPath" placeholder="例如 /Users/peyton/Desktop/project/0-Working-Record.xlsx" />
+
+              <label for="reportDocumentRoot">交付文档搜索目录</label>
+              <input id="reportDocumentRoot" placeholder="默认使用 Excel 台账所在目录" />
+
+              <label>报告类型</label>
+              <div class="reportTypeGrid" role="group" aria-label="报告类型">
+                <button class="reportType active" type="button" data-report-type="weekly">周报</button>
+                <button class="reportType" type="button" data-report-type="monthly">月报</button>
+                <button class="reportType" type="button" data-report-type="quarterly">季度报</button>
+                <button class="reportType" type="button" data-report-type="annual">年度报告</button>
+              </div>
+
+              <div class="dateGrid">
+                <div>
+                  <label for="reportStartDate">开始日期</label>
+                  <input id="reportStartDate" type="date" />
+                </div>
+                <div>
+                  <label for="reportEndDate">结束日期</label>
+                  <input id="reportEndDate" type="date" />
+                </div>
+              </div>
+
+              <div class="reportOptions"><span>工作完成情况</span><span>风险与问题</span><span>交付文档重点</span><span>后续计划</span></div>
+              <button id="reportGenerateBtn" onclick="generateUnifiedReport()">生成报告</button>
+              <div class="reportResult" id="reportResult">
+                <p class="hint">选择报告类型和日期范围后生成报告。系统会读取 `一线支持` 和 `二线支持`，并在本地交付文档目录中递归查找 `交付文档` 字段对应文件，不访问外网。</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="secondaryColumn">
+          <section class="card panel" id="panel-rules">
+            <div class="sectionTitle"><h2>脱敏规则</h2><span class="tag">46 条规则</span></div>
+            <div class="ruleList">
+              <details open>
+                <summary>身份与联系方式</summary>
+                <div class="ruleChips">
+                  <span>身份证号 <code>&lt;ID_CARD&gt;</code></span>
+                  <span>护照号 <code>&lt;PASSPORT&gt;</code></span>
+                  <span>港澳证件 <code>&lt;HK_ID&gt;</code></span>
+                  <span>台湾证件 <code>&lt;TW_ID&gt;</code></span>
+                  <span>手机号 <code>&lt;PHONE&gt;</code></span>
+                  <span>固定电话 <code>&lt;FIXED_PHONE&gt;</code></span>
+                  <span>邮箱 <code>&lt;EMAIL&gt;</code></span>
+                  <span>车牌号 <code>&lt;VEHICLE_PLATE&gt;</code></span>
+                </div>
+              </details>
+              <details open>
+                <summary>金融、票据与交易标识</summary>
+                <div class="ruleChips">
+                  <span>银行卡号 <code>&lt;BANK_CARD&gt;</code></span>
+                  <span>银行账户 <code>&lt;BANK_ACCOUNT&gt;</code></span>
+                  <span>SWIFT/BIC <code>&lt;SWIFT_CODE&gt;</code></span>
+                  <span>支付系统行号 <code>&lt;CNAPS_CODE&gt;</code></span>
+                  <span>证券账户 <code>&lt;SECURITY_ACCOUNT&gt;</code></span>
+                  <span>股票代码 <code>&lt;STOCK_CODE&gt;</code></span>
+                  <span>基金代码 <code>&lt;FUND_CODE&gt;</code></span>
+                  <span>合同编号 <code>&lt;CONTRACT_NO&gt;</code></span>
+                  <span>交易流水 <code>&lt;TXN_NO&gt;</code></span>
+                  <span>发票号 <code>&lt;INVOICE_NO&gt;</code></span>
+                  <span>纳税人识别号 <code>&lt;TAXPAYER_ID&gt;</code></span>
+                </div>
+              </details>
+              <details open>
+                <summary>系统资产、密钥与连接信息</summary>
+                <div class="ruleChips">
+                  <span>IPv4/IPv6 <code>&lt;IP&gt;</code></span>
+                  <span>MAC 地址 <code>&lt;MAC&gt;</code></span>
+                  <span>主机名字段 <code>&lt;HOSTNAME&gt;</code></span>
+                  <span>密码/Token/API Key/Cookie <code>&lt;REDACTED&gt;</code></span>
+                  <span>URL 敏感参数 <code>&lt;REDACTED&gt;</code></span>
+                  <span>私钥块 <code>&lt;PRIVATE_KEY&gt;</code></span>
+                  <span>数据库连接串 <code>&lt;DB_CONNECTION&gt;</code></span>
+                </div>
+              </details>
+              <details>
+                <summary>个人字段类敏感信息</summary>
+                <div class="ruleChips">
+                  <span>姓名字段 <code>&lt;NAME&gt;</code></span>
+                  <span>地址字段 <code>&lt;ADDRESS&gt;</code></span>
+                  <span>位置/经纬度字段 <code>&lt;LOCATION&gt;</code></span>
+                  <span>出生日期字段 <code>&lt;DATE&gt;</code></span>
+                  <span>账号/用户字段 <code>&lt;ACCOUNT&gt;</code></span>
+                  <span>金融金额字段 <code>&lt;FINANCIAL_INFO&gt;</code></span>
+                  <span>利率字段 <code>&lt;RATE&gt;</code></span>
+                  <span>信用评分字段 <code>&lt;CREDIT_SCORE&gt;</code></span>
+                  <span>贷款状态字段 <code>&lt;LOAN_STATUS&gt;</code></span>
+                  <span>抵押/担保字段 <code>&lt;COLLATERAL&gt;</code></span>
+                </div>
+              </details>
+              <details>
+                <summary>企业、监管与合规字段</summary>
+                <div class="ruleChips">
+                  <span>统一社会信用代码 <code>&lt;CREDIT_CODE&gt;</code></span>
+                  <span>企业/机构名称字段 <code>&lt;COMPANY_NAME&gt;</code></span>
+                  <span>法人代表字段 <code>&lt;LEGAL_PERSON&gt;</code></span>
+                  <span>反洗钱/名单字段 <code>&lt;AML_INFO&gt;</code></span>
+                  <span>监管批复/许可字段 <code>&lt;COMPLIANCE_INFO&gt;</code></span>
+                </div>
+              </details>
+              <details>
+                <summary>特殊敏感信息字段</summary>
+                <div class="ruleChips">
+                  <span>医疗信息字段 <code>&lt;MEDICAL_INFO&gt;</code></span>
+                  <span>生物识别字段 <code>&lt;BIOMETRIC&gt;</code></span>
+                  <span>宗教信仰字段 <code>&lt;RELIGION&gt;</code></span>
+                  <span>未成年人/监护人字段 <code>&lt;MINOR_INFO&gt;</code></span>
+                </div>
+              </details>
+            </div>
+          </section>
+
+          <section class="card panel" id="panel-scope">
+            <div class="sectionTitle"><h2>文件范围</h2><span class="tag neutral">当前版本</span></div>
+            <div class="scopeGrid">
+              <span>.docx</span><span>.pptx</span><span>.xlsx</span><span>.txt</span><span>.csv</span><span>.json</span><span>.log</span><span>.md</span>
+            </div>
+            <p class="hint">旧版 Office、PDF 和未知二进制文件默认跳过，避免未脱敏内容进入输出目录。</p>
+          </section>
+
+          <section class="card panel" id="panel-report">
+            <div class="sectionTitle"><h2>报告说明</h2><span class="tag">JSON</span></div>
+            <p class="hint">任务完成后会在目标目录生成 <code>desensitization_report.json</code>，记录处理数量、跳过文件、失败文件和规则命中次数。</p>
+          </section>
+
+          <section class="card panel riskPanel" id="panel-risk">
+            <div class="sectionTitle"><h2>风险提示</h2><span class="tag warn">需抽查</span></div>
+            <p>规则脱敏可能存在误判或漏判。图片 OCR、PDF 原格式、嵌入对象、复杂宏和旧版 Office 文件暂未覆盖，正式使用前需要人工抽查脱敏结果。</p>
+          </section>
+        </aside>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
