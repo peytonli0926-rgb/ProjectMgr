@@ -14,7 +14,7 @@ PATTERN_DEFINITIONS = [
     ("email", r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "<EMAIL>"),
     ("vehicle_plate", r"[\u4e00-\u9fa5][A-Z][A-Z0-9]{5,6}", "<VEHICLE_PLATE>"),
     ("bank_card", r"(?<!\d)(?:\d{13,19}|\d{4}(?:[ -]\d{4}){2,4})(?!\d)", "<BANK_CARD>"),
-    ("swift_bic", r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:XXX|[A-Z0-9]{3})?\b", "<SWIFT_CODE>"),
+    ("swift_bic", r"(?i)\b(?!(?:DESCRIPTION|ADDRESS|PROTOCOL|LISTENER|HOSTNAME|DATABASE|INSTANCE|UNIQUE|PRIMARY|STANDARD|SYSTEM|SYSAUX|USERS|TEMP|TOOLS|EXAMPLE|ACCESS|PRIVATE|SECRET|TOKEN|PASSWORD|BIRTHDAY|BALANCE|AMOUNT|ACCOUNT|COMPANY|PERSON|PHONE|EMAIL|CARD|BANK|FQDN|TABLESPACE|DATAFILE|CONTROLFILE|UNDOTBS|DATA|INDEX|LOB|TEMP|RENAME|ALTER|CREATE|DROP|SELECT|INSERT|UPDATE|DELETE|GRANT|REVOKE|COMMIT|ROLLBACK|TRUNCATE|EXECUTE|BEGIN|DECLARE|CURSOR|FETCH|CLOSE|OPEN|LOOP|WHILE|FOR|IF|THEN|ELSE|END|CASE|WHEN|AND|OR|NOT|INTO|FROM|WHERE|HAVING|GROUP|ORDER|BY|ASC|DESC|LIMIT|OFFSET|UNION|ALL|DISTINCT|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|AS|LIKE|BETWEEN|EXISTS|COUNT|SUM|AVG|MAX|MIN|NULL|TRUE|FALSE|IS|SID|SERIAL|FIRST|LAST|NEXT|PREV|CURRENT|SESSION|SERIAL#|CONNECT\$|RESOURCE|DBA|EXP|IMP|SQL|PLSQL|JAVA|XML|DBMS|UTL|SYS|PUBLIC|PROCEDURE|FUNCTION|PACKAGE|TRIGGER|VIEW|SEQUENCE|SYNONYM|MATERIALIZED|SNAPSHOT|LOG|FILE|MEMBER|LINK|TYPE|BODY|SPECIFICATION|OBJECT|TABLE|INDEX|CLUSTER|HASH|RANGE|LIST|COMPOSITE|PARTITION|SUBPARTITION|LOCAL|GLOBAL|SHARED|EXCLUSIVE|ROW|ROWS|PAGE|BLOCK|EXTENT|SEGMENT|TABLESPACE|DATAFILE|CONTROLFILE|REDO|LOGFILE|ARCHIVE|BACKUP|RECOVER|RMAN|FLASHBACK|PURGE|UNDROP|PASSWORD|PROFILE|ROLE|PRIVILEGE|SYSTEM|SYSAUX|USERS|TEMP|UNDOTBS|EXAMPLE|TOOLS|DATA|INDEX|LOB)[A-Z0-9_]*)\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:XXX|[A-Z0-9]{3})?\b", "<SWIFT_CODE>"),
     ("cnaps_code", r"\b\d{12}\b", "<CNAPS_CODE>"),
     ("bank_account", r"\b\d{15,21}\b", "<BANK_ACCOUNT>"),
     ("security_account", r"\b[A-Z]\d{9,10}\b", "<SECURITY_ACCOUNT>"),
@@ -28,6 +28,19 @@ PATTERN_DEFINITIONS = [
     ("ipv6", r"\b(?:[0-9A-Fa-f]{1,4}:){2,7}[0-9A-Fa-f]{1,4}\b", "<IP>"),
     ("ip", r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b", "<IP>"),
     ("mac", r"\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}\b", "<MAC>"),
+    ("url_hostname", r"(?i)\b((?:https?|ftp)://)(?!<IP>)([A-Za-z0-9][A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,})(?=[:/?#]|$)", r"\1<HOSTNAME>"),
+    ("fqdn_hostname", r"(?i)\b(?!<HOSTNAME>)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+(?:local|lan|internal|intranet|corp|bank|com|cn|net|org)\b", "<HOSTNAME>"),
+    ("table_hostname_field", r"(?i)\b(HOST_NAME|HOSTNAME|SERVER_NAME|MACHINE_NAME|主机名|服务器名|节点名)\s+((?=[A-Za-z0-9._-]*(?:\d|db|app|web|srv|host|node|rac|scan|ora))[A-Za-z][A-Za-z0-9._-]{1,253})\b", r"\1 <HOSTNAME>"),
+    # ────────── 数据库 / TFA / AWR 运维敏感信息 ──────────
+    ("awr_db_info_table", r"(?i)\b(DB Name|DB Id|Unique Name|Instance Name|Host Name|数据库名|实例名|节点名)\s*[:：]?\s+[A-Za-z0-9_#]{3,30}\b", "<DB_INFO>"),
+    ("oracle_env_var", r"(?i)(?:ORACLE_SID|ORACLE_HOME|ORACLE_BASE|ORACLE_UNQNAME|TNS_ADMIN|LD_LIBRARY_PATH|ORA_NLS|NLS_LANG)\s*=\s*['\"]?[^\s'\"\r\n]+['\"]?", "<DB_ENV_VAR>"),
+    ("datafile_path", r"(?i)[/\\](?:u0[1-9]|oradata|oracle|app[/\\](?:admin|oracle))[\w\-\./\\]+\.(?:dbf|log|ctl|ora|dat|arc|trc|trm|pdb)\b", "<DB_FILE_PATH>"),
+    ("asm_diskgroup", r"(?i)\b(?:\+DATA|\+FRA|\+RECO|\+ARCH|\+OCR_VOTE|\+SYSTEMG|\+BACKUP)(?=[/\s]|$)", "<ASM_DISKGROUP>"),
+    ("oracle_system_tables", r"\b(?:DBA_|ALL_|USER_|V_(?:\$|\\$)|GV_(?:\$|\\$)|X\$|CDB_)[A-Z][A-Z0-9_#\$]{1,30}\b", "<DB_OBJECT>"),
+    ("tbspace_standard_names", r"(?i)\b(?:tablespace_name|表空间名|表空间)\s*[:=：]\s*(?:SYSTEM|SYSAUX|USERS|UNDOTBS[0-9]*|TEMP|TOOLS|EXAMPLE|DATA|INDEX|LOB)\b", r"<DB_OBJECT>"),
+    ("pdb_names", r"(?i)\b(?:PDB|CDB|PDB\$SEED)\b", "<PDB_NAME>"),
+    ("listener_config", r"(?i)\bLISTENER\s*=\s*\(DESCRIPTION", "<LISTENER>"),
+    ("generic_infra_hostname", r"(?i)(?<![:./@A-Za-z0-9-])(?=[A-Za-z0-9-]*(?:db|app|web|srv|host|node|rac|scan|ora|oracle))(?=[A-Za-z0-9-]*\d)[A-Za-z][A-Za-z0-9-]{2,63}\b", "<HOSTNAME>"),
     ("secret_field", r"(?i)(?<![A-Za-z0-9_])(['\"]?(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|private[_-]?key|session|sid|cookie|auth_token|refresh_token|app_secret|client_secret)['\"]?\s*[:=]\s*['\"]?)[^'\"\s,;}\r\n]+(['\"]?)", r"\1<REDACTED>\2"),
     ("hostname_field", r"(?i)(?<![A-Za-z0-9_])(['\"]?(?:host|hostname|host_name|server|server_name|machine|machine_name)['\"]?\s*[:=]\s*['\"]?)[A-Za-z0-9][A-Za-z0-9._-]{1,253}(['\"]?)", r"\1<HOSTNAME>\2"),
     ("name_field", r"(?i)(?<![A-Za-z0-9_])(['\"]?(?:name|real_name|full_name|customer_name|user_name|contact_person|applicant|counterparty|beneficiary|姓名|客户姓名|用户姓名|联系人)['\"]?\s*[:=]\s*['\"]?)[^'\"\s,;}，；\r\n]+(['\"]?)", r"\1<NAME>\2"),
@@ -93,3 +106,34 @@ def redact_office_xml(xml_text: str):
         return f">{redacted}<"
 
     return re.sub(r">([^<]*)<", redact_between_tags, xml_text), counts
+
+
+def redact_html_text(html_text: str):
+    """对 HTML 内容脱敏，保留标签结构不破坏。"""
+    counts = {}
+
+    def redact_text_outside_tags(match):
+        before_tag = match.group(1)
+        tag = match.group(2)
+        redacted, delta = redact_text(before_tag)
+        merge_counts(counts, delta)
+        return f"{redacted}{tag}"
+
+    # 先处理 <script>/<style> 块中的内容（跳过它们内部的敏感文本，仅处理普通文本区域）
+    def skip_script_style(whole_match):
+        return whole_match
+
+    # 策略：对 HTML 中的纯文本部分（tag 之间的内容）做脱敏
+    redacted = re.sub(r"([^<]*)(<[^>]+>)", redact_text_outside_tags, html_text)
+    # 处理最后一段文本（如果没有尾部标签）
+    if redacted.rstrip().endswith(">"):
+        pass  # 已处理
+    else:
+        # 处理末尾纯文本
+        parts = redacted.rsplit(">", 1)
+        if len(parts) == 2:
+            tail_text = parts[1]
+            redacted_tail, delta = redact_text(tail_text)
+            merge_counts(counts, delta)
+            redacted = parts[0] + ">" + redacted_tail
+    return redacted, counts

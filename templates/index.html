@@ -33,6 +33,12 @@
           <summary><span>报告生成</span><i></i></summary>
           <button class="navItem" data-panel="report-generator">统一报告生成</button>
         </details>
+        <details class="navGroup" open>
+          <summary><span>AI 分析</span><i></i></summary>
+          <button class="navItem" data-panel="deepseek-config">DeepSeek 设置</button>
+          <button class="navItem" data-panel="awr-analysis">AWR 性能分析</button>
+          <button class="navItem" data-panel="tfa-analysis">TFA 日志分析</button>
+        </details>
         <details class="navGroup">
           <summary><span>审计与安全</span><i></i></summary>
           <button class="navItem" data-panel="report">报告说明</button>
@@ -54,7 +60,7 @@
         <div>
           <p class="eyebrow">文件脱敏工作台</p>
           <h1 id="pageTitle">扫描、识别并生成安全脱敏副本</h1>
-          <p class="subtitle" id="pageSubtitle">输入本机目录后先扫描文件数量和类型，确认后再创建同级 <b>_desensitized</b> 目录。</p>
+          <p class="subtitle" id="pageSubtitle">输入本机目录后扫描所有文件（不限类型），确认后再创建同级 <b>_desensitized</b> 目录。</p>
         </div>
         <div class="heroBadges">
           <span>本地处理</span>
@@ -78,6 +84,7 @@
               <button class="secondary" onclick="scan()">扫描文件</button>
               <button id="startBtn" onclick="startJob()" disabled>确认后开始脱敏</button>
             </div>
+            <label class="checkRow"><input id="autoRun" type="checkbox" checked /> 扫描后自动执行脱敏（跳过确认步骤）</label>
             <p class="hint">扫描动作不会创建目录，也不会修改文件；确认脱敏后才会生成目标目录。</p>
 
             <div class="metrics">
@@ -85,6 +92,21 @@
               <div class="metric"><b id="processed">0</b><span>已处理</span></div>
               <div class="metric"><b id="skipped">0</b><span>跳过文件</span></div>
               <div class="metric"><b id="failed">0</b><span>失败文件</span></div>
+            </div>
+
+            <div class="divider"></div>
+            <div class="sectionTitle compactTitle">
+              <h2>单文件脱敏</h2>
+              <span class="tag">金融行业规则</span>
+            </div>
+            <label for="singleFilePath">文件路径</label>
+            <div class="inputRow">
+              <input id="singleFilePath" placeholder="例如 /Users/peyton/Desktop/customer_data.xlsx" />
+              <button type="button" onclick="redactSingleFile()">生成脱敏文件</button>
+            </div>
+            <p class="hint">仅处理指定文件，源文件不修改；新文件会生成在同目录，文件名追加 <code>_desensitized</code>。</p>
+            <div class="singleFileResult" id="singleFileResult">
+              <p class="hint">支持所有文件类型。Office 文件 (.docx/.pptx/.xlsx) 解析内部 XML 脱敏；其他文件尝试以文本方式脱敏。</p>
             </div>
           </section>
 
@@ -149,6 +171,24 @@
                 </div>
               </div>
 
+              <!-- AI 增强开关 -->
+              <div class="reportAiSection">
+                <label class="reportAiToggle">
+                  <input type="checkbox" id="reportAiEnable" onchange="toggleReportAi()" />
+                  <span class="reportAiToggleUI"></span>
+                  <span><b>🤖 AI 增强报告</b></span>
+                </label>
+                <div class="reportAiConfig" id="reportAiConfig" style="display:none">
+                  <label for="reportDsMode">AI 模型选择</label>
+                  <select id="reportDsMode">
+                    <option value="">默认（使用 DeepSeek 设置中激活的模型）</option>
+                    <option value="local">本地模型</option>
+                    <option value="online">联网模型</option>
+                  </select>
+                  <p class="hint">启用后，系统会将统计数据发送给大模型进行语言润色和内容增强，并自动生成统计图表嵌入 Word 报告中。</p>
+                </div>
+              </div>
+
               <div class="reportOptions"><span>工作完成情况</span><span>风险与问题</span><span>交付文档重点</span><span>后续计划</span></div>
               <button id="reportGenerateBtn" onclick="generateUnifiedReport()">生成报告</button>
               <div class="reportResult" id="reportResult">
@@ -156,11 +196,326 @@
               </div>
             </div>
           </section>
+
+          <section class="card panel" id="panel-deepseek-config">
+            <div class="sectionTitle"><h2>DeepSeek 设置</h2><span class="tag">模型与服务</span></div>
+            <div class="dsConfigBuilder">
+
+              <div class="dsConfigHero">
+                <b>🔮 DeepSeek 配置</b>
+                <span>配置本地或联网模型服务参数，选择要使用的模型。配置完成后可前往「AWR 性能分析」页面进行报告分析。</span>
+              </div>
+
+              <!-- 模式选择 -->
+              <div class="dsModeSelector">
+                <label class="dsModeOption dsModeActive" id="dsModeLocalLabel">
+                  <input type="radio" name="dsMode" value="local" checked onchange="toggleDsMode()" />
+                  <span class="dsModeIcon">🖥️</span>
+                  <span class="dsModeLabel"><b>本地地址</b><small>使用本地 Ollama 等服务</small></span>
+                </label>
+                <label class="dsModeOption" id="dsModeOnlineLabel">
+                  <input type="radio" name="dsMode" value="online" onchange="toggleDsMode()" />
+                  <span class="dsModeIcon">🌐</span>
+                  <span class="dsModeLabel"><b>联网地址</b><small>使用在线 API 服务</small></span>
+                </label>
+              </div>
+
+              <!-- 本地配置面板 -->
+              <div class="dsConfigCard" id="dsPanelLocal">
+                <div class="sectionTitle compactTitle"><h3>🖥️ 本地配置</h3></div>
+                <div class="dsConfigGrid">
+                  <div class="dsFieldWithTest">
+                    <div>
+                      <label for="dsLocalUrl">接口地址</label>
+                      <input id="dsLocalUrl" placeholder="http://127.0.0.1:11434/api/chat" />
+                    </div>
+                    <button type="button" class="dsTestBtn" onclick="testDsConnection('local')" title="测试连接">🔄 测试</button>
+                  </div>
+                  <div>
+                    <label for="dsLocalModel">选择模型</label>
+                    <select id="dsLocalModel">
+                      <option value="">正在加载本地模型...</option>
+                    </select>
+                    <p class="hint">系统自动发现本地可用模型</p>
+                  </div>
+                </div>
+                <div class="dsTestResult" id="dsTestResultLocal" style="display:none;"></div>
+              </div>
+
+              <!-- 联网配置面板 -->
+              <div class="dsConfigCard" id="dsPanelOnline" style="display:none;">
+                <div class="sectionTitle compactTitle"><h3>🌐 联网配置</h3></div>
+                <div class="dsConfigGrid">
+                  <div class="dsFieldWithTest">
+                    <div>
+                      <label for="dsOnlineUrl">接口地址</label>
+                      <input id="dsOnlineUrl" placeholder="https://api.deepseek.com/chat/completions" value="https://api.deepseek.com/chat/completions" />
+                    </div>
+                    <button type="button" class="dsTestBtn" onclick="testDsConnection('online')" title="测试连接">🔄 测试</button>
+                  </div>
+                  <div>
+                    <label for="dsOnlineModel">选择模型</label>
+                    <input id="dsOnlineModel" placeholder="deepseek-chat" value="deepseek-chat" />
+                    <p class="hint">在线模型请手动输入模型名称</p>
+                  </div>
+                </div>
+                <div style="margin-top:14px;">
+                  <label for="dsOnlineApiKey">API Key（仅在线模型需要）</label>
+                  <input id="dsOnlineApiKey" type="password" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                  <p class="hint">使用 OpenAI 兼容的在线 API 时必须填写</p>
+                </div>
+                <div class="dsTestResult" id="dsTestResultOnline" style="display:none;"></div>
+              </div>
+
+              <!-- 状态与操作 -->
+              <div class="dsConfigCard">
+                <div class="dsConnStatus">
+                  <div class="dsConnDot" id="dsConnDot"></div>
+                  <div>
+                    <b id="dsConnLabel">连接状态</b>
+                    <span id="dsConnDesc">尚未检测</span>
+                  </div>
+                  <button type="button" class="secondary" onclick="loadOracleLstFiles()">刷新模型列表</button>
+                </div>
+                <div class="dsConfigActions">
+                  <button type="button" class="primary" onclick="saveDeepseekConfig()">💾 保存配置</button>
+                  <span class="dsSaveHint" id="dsSaveHint"></span>
+                </div>
+              </div>
+
+              <div class="dsConfigNote">
+                <b>💡 使用提示</b>
+                <ul>
+                  <li><b>本地 Ollama：</b>地址填 <code>http://127.0.0.1:11434/api/chat</code>，模型自动发现，无需 API Key</li>
+                  <li><b>联网 DeepSeek：</b>默认地址 <code>https://api.deepseek.com/chat/completions</code>，模型填 <code>deepseek-chat</code>，填入 API Key</li>
+                  <li>其他 OpenAI 兼容 API 可自行填入对应地址和模型名</li>
+                  <li>通过上方选项卡选择使用「本地地址」还是「联网地址」</li>
+                  <li>配置完成后，可前往「AWR 性能分析」页面进行报告分析</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="card panel" id="panel-awr-analysis">
+            <div class="sectionTitle"><h2>AWR 性能分析</h2><span class="tag">Oracle 诊断</span></div>
+            <div class="awrAnalysisBuilder">
+              <div class="dsConfigHero awrHero">
+                <b>📊 AWR Report Analyzer</b>
+                <span>读取本地 Oracle 性能对比 .lst 文件或 AWR HTML 报告，调用 DeepSeek 本地模型生成可下载的分析报告。</span>
+              </div>
+
+              <div class="awrTabs" role="tablist">
+                <button class="awrTab active" data-awr-tab="lst" type="button">.lst 性能对比分析</button>
+                <button class="awrTab" data-awr-tab="awr-html" type="button">AWR HTML 报告分析</button>
+              </div>
+
+              <!-- 分析模型选择 -->
+              <div class="awrModelSelector">
+                <label for="dsAnalysisMode">分析模型</label>
+                <select id="dsAnalysisMode">
+                  <option value="">DeepSeek 设置中的当前激活配置</option>
+                  <option value="local">🖥️ 本地模型</option>
+                  <option value="online">🌐 联网模型</option>
+                </select>
+              </div>
+
+              <div class="awrTabPanel active" id="awrTab-lst">
+                <div class="awrSectionCard">
+                  <div class="sectionTitle compactTitle"><h3>Oracle .lst 文件</h3><span class="tag">性能对比</span></div>
+                  <label for="oracleLstPath">选择 .lst 文件</label>
+                  <div class="inputRow">
+                    <select id="oracleLstPath"></select>
+                    <button class="secondary" type="button" onclick="loadOracleLstFiles()">刷新列表</button>
+                    <button type="button" onclick="analyzeOracleLst()">开始分析</button>
+                  </div>
+                  <label class="checkRow"><input id="oracleUseLatest" type="checkbox" checked /> 自动使用 data 目录下最新的 .lst 文件</label>
+                </div>
+              </div>
+
+              <div class="awrTabPanel" id="awrTab-awr-html">
+                <div class="awrSectionCard">
+                  <div class="sectionTitle compactTitle"><h3>AWR HTML 报告</h3><span class="tag">AWR Report</span></div>
+                  <label for="oracleAwrPath">AWR 报告文件路径</label>
+                  <div class="inputRow">
+                    <input id="oracleAwrPath" placeholder="例如 /Users/peyton/Desktop/awr_orcl_1_100_101.html" />
+                    <button class="secondary" type="button" onclick="chooseAwrUpload()">上传文件</button>
+                    <button type="button" onclick="analyzeOracleAwr()">分析 AWR</button>
+                  </div>
+                  <input id="awrUploadInput" type="file" accept=".html,.htm" hidden />
+                </div>
+
+                <div class="awrSectionCard">
+                  <label for="oracleAwrSelect">从 data 目录选择 AWR 文件</label>
+                  <div class="inputRow">
+                    <select id="oracleAwrSelect">
+                      <option value="">未发现 AWR 文件，可手动输入路径</option>
+                    </select>
+                    <button class="secondary" type="button" onclick="fillSelectedAwrFile()">填充路径</button>
+                    <button class="secondary" type="button" onclick="generateAwrWordReport()">生成 Word 报告</button>
+                  </div>
+                  <p class="hint">将 AWR HTML 分析结果合并输出为格式化的 Word 文档。</p>
+                </div>
+              </div>
+
+              <div class="awrSectionCard">
+                <div class="sectionTitle compactTitle"><h3>Word 报告模板</h3><span class="tag neutral">可选</span></div>
+                <label for="oracleReportTemplate">选择模板文档</label>
+                <select id="oracleReportTemplate">
+                  <option value="">不使用模板（纯 AI 生成）</option>
+                </select>
+                <p class="hint">模板用于格式化 .lst 和 AWR 分析输出的 Word 报告样式。</p>
+              </div>
+
+              <div class="awrResultBlock" id="oracleAnalysisResult">
+                <p class="hint">先确认本地 DeepSeek 服务可访问。默认兼容 Ollama <code>/api/chat</code> 接口，分析结果会写入 <code>output/</code> 目录。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="card panel" id="panel-tfa-analysis">
+            <div class="sectionTitle"><h2>TFA 日志自动分析</h2><span class="tag">v1.0</span></div>
+            <div class="tfaBuilder">
+              <div class="dsConfigHero tfaHero">
+                <b>🔍 Oracle TFA Analyzer</b>
+                <span>输入已脱敏的 Oracle TFA zip 包，自动解压并分析八大方向，生成 evidence.json 以及领导汇报版 + 技术专家版 Word 报告。</span>
+              </div>
+
+              <div class="tfaSteps">
+                <div class="tfaStep active"><b>1</b>选择 TFA zip 包</div>
+                <div class="tfaStep"><b>2</b>自动解压扫描</div>
+                <div class="tfaStep"><b>3</b>规则分析</div>
+                <div class="tfaStep"><b>4</b>生成报告</div>
+              </div>
+
+              <div class="awrSectionCard">
+                <label for="tfaZipPath">TFA zip 包路径</label>
+                <div class="inputRow">
+                  <input id="tfaZipPath" placeholder="例如 /Users/peyton/Desktop/tfa_orcl_20250101.zip" />
+                  <button class="secondary" type="button" onclick="chooseTfaUpload()">上传 zip</button>
+                  <button type="button" onclick="analyzeTfa()" id="tfaAnalyzeBtn">开始分析</button>
+                </div>
+                <div class="tfaTimeFilterRow">
+                  <label>时间范围</label>
+                  <div class="tfaTimeFilterOptions" id="tfaTimeFilterOptions">
+                    <span class="tfaTimeOption active" data-mode="all" data-days="">不限时间</span>
+                    <span class="tfaTimeOption" data-mode="today" data-days="1">当天内</span>
+                    <span class="tfaTimeOption" data-mode="custom" data-days="">自定义范围</span>
+                  </div>
+                </div>
+                <div class="tfaCustomDateRow" id="tfaCustomDateRow" style="display:none">
+                  <div class="tfaDateFields">
+                    <div>
+                      <label for="tfaDateStart">起始日期</label>
+                      <input id="tfaDateStart" type="date" />
+                    </div>
+                    <div>
+                      <label for="tfaDateEnd">截止日期</label>
+                      <input id="tfaDateEnd" type="date" />
+                    </div>
+                  </div>
+                </div>
+                <input id="tfaUploadInput" type="file" accept=".zip" hidden />
+                <input id="tfaJobId" type="hidden" value="" />
+                <p class="hint">仅接受已脱敏的 TFA zip 包，程序在本地解压分析，不上传任何原始数据。</p>
+              </div>
+
+              <div class="tfaDirectionGrid">
+                <div class="tfaDirCard">
+                  <span>🛢️</span><b>数据库错误与稳定性</b>
+                  <p>ORA-00600 · ORA-07445 · 实例崩溃 · 递归 SQL 错误 · 通用 ORA-错误<br/>
+                  <code class="tfaRuleHint">alert_*.log | DB-001 ~ DB-005</code></p>
+                </div>
+                <div class="tfaDirCard">
+                  <span>🔗</span><b>RAC / Clusterware</b>
+                  <p>CRS offline · 节点隔离/重启 · 脑裂 · OCR/Voting Disk · ASM-CRS 通信<br/>
+                  <code class="tfaRuleHint">crsd.log · cssd.log · OCRDUMP · GETCSS | RAC-001 ~ RAC-005</code></p>
+                </div>
+                <div class="tfaDirCard">
+                  <span>💾</span><b>ASM / 存储</b>
+                  <p>磁盘 OFFLINE · 磁盘组挂载失败 · 存储 I/O 错误<br/>
+                  <code class="tfaRuleHint">asm_alert.log · CONFIGASM · DEV_ASM_CONTENTS | ASM-001 ~ ASM-003</code></p>
+                </div>
+                <div class="tfaDirCard">
+                  <span>🖥️</span><b>OS 资源</b>
+                  <p>CPU 过载 · 内存/Swap 高 · Kernel Panic · 网络/进程/硬件/包<br/>
+                  <code class="tfaRuleHint">PS · VMSTAT · TOP · DMESG · NETSTAT · IOSTAT | OS-001 ~ OS-003</code></p>
+                </div>
+                <div class="tfaDirCard">
+                  <span>⚡</span><b>I/O 性能</b>
+                  <p>磁盘延迟过高 · I/O 吞吐量异常<br/>
+                  <code class="tfaRuleHint">IOSTAT · AWR data | IO-001 ~ IO-002</code></p>
+                </div>
+                <div class="tfaDirCard">
+                  <span>📡</span><b>连接 / 监听</b>
+                  <p>监听器停止 · 连接风暴 · TNS 连接超时 (ORA-12170)<br/>
+                  <code class="tfaRuleHint">listener*.log · sqlnet.log | LSN-001 ~ LSN-003</code></p>
+                </div>
+                <div class="tfaDirCard">
+                  <span>🐌</span><b>SQL / 性能争用</b>
+                  <p>Top SQL 耗时 · Enqueue/锁争用 · 临时表空间异常<br/>
+                  <code class="tfaRuleHint">AWR top SQL · *.trc · *.trm | SQL-001 ~ SQL-003</code></p>
+                </div>
+                <div class="tfaDirCard">
+                  <span>🔄</span><b>ADG / 备份</b>
+                  <p>DG 日志缺口 · 同步延迟 · RMAN 错误<br/>
+                  <code class="tfaRuleHint">*adg*.log · dr*.log · rman*.log | ADG-001 ~ ADG-003</code></p>
+                </div>
+              </div>
+
+              <div class="tfaResultBlock" id="tfaResult">
+                <div class="tfaEmptyState">
+                  <b>📋 等待分析</b>
+                  <span>选择 TFA zip 包后点击「开始分析」，系统将自动执行完整分析流程。</span>
+                </div>
+              </div>
+
+              <!-- 故障时间线面板 -->
+              <div class="tfaTimelineBlock" id="tfaTimelineBlock" style="display:none">
+                <div class="tfaTimelineHeader">
+                  <h3>⏱ 故障时间线</h3>
+                  <span class="tfaTimelineBadge" id="tfaTimelineBadge">0 簇</span>
+                </div>
+                <div class="tfaTimelineSummary" id="tfaTimelineSummary"></div>
+                <div class="tfaTimelineCanvas" id="tfaTimelineCanvas">
+                  <!-- 时间线 SVG/HTML 由 JS 动态渲染 -->
+                </div>
+                <div class="tfaClusterList" id="tfaClusterList">
+                  <!-- 故障簇详情列表 -->
+                </div>
+              </div>
+
+              <!-- 分析链看板 -->
+              <div class="tfaChainBlock" id="tfaChainBlock" style="display:none">
+                <div class="tfaChainSection">
+                  <div class="tfaChainHeader">
+                    <h3>🔗 分析链看板</h3>
+                    <span class="tfaChainBadge" id="tfaChainBadge">0 链</span>
+                  </div>
+                  <p class="hint" style="margin:0 0 16px 0;">
+                    以关键日志入口为起点，展示完整的分析路线：入口文件 → 发现问题 → 交叉验证快照 → 关联证据 → 根因结论。
+                  </p>
+
+                  <!-- SVG 总览图 -->
+                  <div class="tfaChainOverview" id="tfaChainOverview">
+                    <svg class="tfaChainSvg" id="tfaChainSvg" width="100%" height="80" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <marker id="chainArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1"/></marker>
+                      </defs>
+                      <line x1="20" y1="40" x2="calc(100% - 20)" y2="40" stroke="#e0e7ff" stroke-width="2" stroke-dasharray="4,4"/>
+                    </svg>
+                  </div>
+
+                  <!-- 分析链列表 -->
+                  <div class="tfaChainList" id="tfaChainList"></div>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
 
         <aside class="secondaryColumn">
           <section class="card panel" id="panel-rules">
-            <div class="sectionTitle"><h2>脱敏规则</h2><span class="tag">46 条规则</span></div>
+            <div class="sectionTitle"><h2>脱敏规则</h2><span class="tag">58 条规则</span></div>
             <div class="ruleList">
               <details open>
                 <summary>身份与联系方式</summary>
@@ -180,13 +535,13 @@
                 <div class="ruleChips">
                   <span>银行卡号 <code>&lt;BANK_CARD&gt;</code></span>
                   <span>银行账户 <code>&lt;BANK_ACCOUNT&gt;</code></span>
-                  <span>SWIFT/BIC <code>&lt;SWIFT_CODE&gt;</code></span>
+                  <span>SWIFT/BIC 代码 <code>&lt;SWIFT_CODE&gt;</code></span>
                   <span>支付系统行号 <code>&lt;CNAPS_CODE&gt;</code></span>
                   <span>证券账户 <code>&lt;SECURITY_ACCOUNT&gt;</code></span>
-                  <span>股票代码 <code>&lt;STOCK_CODE&gt;</code></span>
+                  <span>股票代码（沪/深） <code>&lt;STOCK_CODE&gt;</code></span>
                   <span>基金代码 <code>&lt;FUND_CODE&gt;</code></span>
                   <span>合同编号 <code>&lt;CONTRACT_NO&gt;</code></span>
-                  <span>交易流水 <code>&lt;TXN_NO&gt;</code></span>
+                  <span>交易流水号 <code>&lt;TXN_NO&gt;</code></span>
                   <span>发票号 <code>&lt;INVOICE_NO&gt;</code></span>
                   <span>纳税人识别号 <code>&lt;TAXPAYER_ID&gt;</code></span>
                 </div>
@@ -194,13 +549,31 @@
               <details open>
                 <summary>系统资产、密钥与连接信息</summary>
                 <div class="ruleChips">
-                  <span>IPv4/IPv6 <code>&lt;IP&gt;</code></span>
+                  <span>IPv4 地址 <code>&lt;IP&gt;</code></span>
+                  <span>IPv6 地址 <code>&lt;IP&gt;</code></span>
                   <span>MAC 地址 <code>&lt;MAC&gt;</code></span>
-                  <span>主机名字段 <code>&lt;HOSTNAME&gt;</code></span>
-                  <span>密码/Token/API Key/Cookie <code>&lt;REDACTED&gt;</code></span>
+                  <span>URL 主机名 <code>&lt;HOSTNAME&gt;</code></span>
+                  <span>FQDN 域名 <code>&lt;HOSTNAME&gt;</code></span>
+                  <span>表格主机名字段 <code>&lt;HOSTNAME&gt;</code></span>
+                  <span>通用基础设施主机名 <code>&lt;HOSTNAME&gt;</code></span>
+                  <span>主机名字段值 <code>&lt;HOSTNAME&gt;</code></span>
+                  <span>密码/Token/Secret/API Key <code>&lt;REDACTED&gt;</code></span>
                   <span>URL 敏感参数 <code>&lt;REDACTED&gt;</code></span>
                   <span>私钥块 <code>&lt;PRIVATE_KEY&gt;</code></span>
                   <span>数据库连接串 <code>&lt;DB_CONNECTION&gt;</code></span>
+                </div>
+              </details>
+              <details>
+                <summary>Oracle 数据库 / AWR 运维敏感信息</summary>
+                <div class="ruleChips">
+                  <span>AWR 数据库信息表 <code>&lt;DB_INFO&gt;</code></span>
+                  <span>Oracle 环境变量 <code>&lt;DB_ENV_VAR&gt;</code></span>
+                  <span>数据文件路径 <code>&lt;DB_FILE_PATH&gt;</code></span>
+                  <span>ASM 磁盘组 <code>&lt;ASM_DISKGROUP&gt;</code></span>
+                  <span>Oracle 系统表/视图 <code>&lt;DB_OBJECT&gt;</code></span>
+                  <span>标准表空间名 <code>&lt;DB_OBJECT&gt;</code></span>
+                  <span>PDB 名称 <code>&lt;PDB_NAME&gt;</code></span>
+                  <span>监听器配置 <code>&lt;LISTENER&gt;</code></span>
                 </div>
               </details>
               <details>
@@ -243,9 +616,10 @@
           <section class="card panel" id="panel-scope">
             <div class="sectionTitle"><h2>文件范围</h2><span class="tag neutral">当前版本</span></div>
             <div class="scopeGrid">
-              <span>.docx</span><span>.pptx</span><span>.xlsx</span><span>.txt</span><span>.csv</span><span>.json</span><span>.log</span><span>.md</span>
+              <span>.docx/.pptx/.xlsx</span><span>.txt/.csv/.json</span><span>.log/.md/.sql</span>
+              <span style="grid-column:1/-1;font-weight:normal;background:var(--success-bg);color:var(--success-text)">✓ 所有文件（含未知/二进制类型）均参与脱敏</span>
             </div>
-            <p class="hint">旧版 Office、PDF 和未知二进制文件默认跳过，避免未脱敏内容进入输出目录。</p>
+            <p class="hint">所有文件类型都参与扫描和脱敏处理，非文本文件以文本方式尝试处理。二进制文件（如图片、PDF、压缩包等）的脱敏仅作用于可解码部分。</p>
           </section>
 
           <section class="card panel" id="panel-report">

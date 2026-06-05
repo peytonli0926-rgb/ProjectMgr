@@ -1,0 +1,396 @@
+====================================================================================================
+Oracle Production Performance Compare Report
+====================================================================================================
+问题时间窗口：&bad_day 21:30:00 - 21:45:00
+对比时间窗口：前一天同时间段
+prompt 数据来源：DBA_HIST_ACTIVE_SESS_HISTORY / DBA_HIST_SQLTEXT / DBA_HIST_SQLSTAT / DBA_OBJECTS
+适用场景：生产库昨晚短时间性能抖动、卡顿、连接慢、SQL慢、等待异常、RAC节点负载不均
+====================================================================================================
+
+[0] 数据库基础信息
+---------------------------------------------------------------------------------------------------
+
+DB_NAME         INSTANCE_NUMBER INSTANCE_NAME        HOST_NAME                                VERSION              STARTUP_TIME
+--------------- --------------- -------------------- ---------------------------------------- -------------------- -------------------------
+JHEMR                         2 jhemr2               dzbldb2                                  11.2.0.4.0           2026-05-30 12:12:58
+
+[1] 分析窗口确认
+---------------------------------------------------------------------------------------------------
+
+PERIOD_TYPE  BEGIN_DT                  END_DT                    WINDOW_SECONDS
+------------ ------------------------- ------------------------- --------------
+对比窗口 2026-06-01 21:30:00       2026-06-01 21:45:00                  900
+问题窗口   2026-06-02 21:30:00       2026-06-02 21:45:00                  900
+
+[2] ASH样本总览：判断问题窗口是否明显更忙
+prompt --------------------------------------------------------------------------------------------------- prompt 说明：
+prompt - sample_count 越高，代表该时间窗口内活跃会话越多。
+prompt - hist_ash_aas 为近似 AAS，历史 ASH 通常约 10 秒一个采样点。
+prompt - 问题窗口与对比窗口对比，如果 AAS 明显升高，说明数据库层面确实更忙。
+
+
+PERIOD_TYPE  INSTANCE_NUMBER SESSION_STATE   WAIT_CLASS                SAMPLE_COUNT HIST_ASH_AAS
+------------ --------------- --------------- ------------------------- ------------ ------------
+问题窗口                 2 ON CPU          ON CPU                               6         0.07
+问题窗口                 2 WAITING         User I/O                             1         0.01
+对比窗口               2 ON CPU          ON CPU                              46         0.51
+对比窗口               2 WAITING         Network                              4         0.04
+对比窗口               2 WAITING         System I/O                           1         0.01
+
+[3] 按分钟趋势：看 21:57、21:58、21:59 哪一分钟最异常
+---------------------------------------------------------------------------------------------------
+
+MINUTE_TIME          PROBLEM_SAMPLES BASE_SAMPLES DIFF_SAMPLES RATIO_TO_BASE
+-------------------- --------------- ------------ ------------ -------------
+21:30                              1            2           -1          0.50
+21:31                              0            2           -2          0.00
+21:32                              0            1           -1          0.00
+21:33                              0            2           -2          0.00
+21:34                              0            1           -1          0.00
+21:35                              1            3           -2          0.33
+21:36                              0            1           -1          0.00
+21:37                              0            1           -1          0.00
+21:38                              1            1            0          1.00
+21:39                              0            2           -2          0.00
+21:40                              2            6           -4          0.33
+21:41                              0            8           -8          0.00
+21:42                              0            9           -9          0.00
+21:43                              1            6           -5          0.17
+21:44                              1            6           -5          0.17
+
+[4] Top 等待事件对比：判断是 IO、锁、CPU、提交、网络还是并发问题
+prompt ---------------------------------------------------------------------------------------------------
+
+PERIOD_TYPE  WAIT_CLASS                EVENT                                                        SAMPLE_COUNT PCT_IN_PERIOD
+------------ ------------------------- ------------------------------------------------------------ ------------ -------------
+问题窗口   ON CPU                    ON CPU                                                                  6         85.71
+问题窗口   User I/O                  direct path read                                                        1         14.29
+对比窗口 ON CPU                    ON CPU                                                                 46         90.20
+对比窗口 Network                   SQL*Net more data from dblink                                           4          7.84
+对比窗口 System I/O                control file parallel write                                             1          1.96
+
+[5] Top SQL 对比：定位问题窗口最活跃 SQL
+---------------------------------------------------------------------------------------------------
+
+PERIOD_TYPE  INSTANCE_NUMBER SQL_ID          PLAN_HASH_VALUE WAIT_CLASS           EVENT                                         MODULE                              ACTION                                SAMPLES         AAS
+------------ --------------- --------------- --------------- -------------------- --------------------------------------------- ----------------------------------- ----------------------------------- --------- -----------
+问题窗口                 2 1qawxag16j7gs         912959670 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+问题窗口                 2 2y9jyvpyp23ms        2985806591 ON CPU               ON CPU                                        DataSynchroTools.exe                -                                           1        0.01
+问题窗口                 2 2zg3326ypsvmb        3356155829 ON CPU               ON CPU                                        JHDBServiceHost.exe                 -                                           1        0.01
+问题窗口                 2 27zsk62wt6pnf        2612047951 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+问题窗口                 2 59cavh1tsbz13        2612047951 User I/O             direct path read                              JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 czkn29s20v4fc        3965019557 Network              SQL*Net more data from dblink                 SynchroClient.exe                   -                                           4        0.04
+对比窗口               2 8wt7naucckkuu        3825954357 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 018zw42v71fvp        2606441889 ON CPU               ON CPU                                        SynchroClient.exe                   -                                           1        0.01
+对比窗口               2 cwut61r7k44b4         693419896 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 7567c1yqpjnaj        3149974841 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 8fznf1uj2srx7        3149974841 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 98s64p5760d97         966545363 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 gmn723a3rdgb7         966545363 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 d80x71j4wv7wx         966545363 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 19q32b6fw2s8n        3183832488 ON CPU               ON CPU                                        JHDBServiceHost.exe                 -                                           1        0.01
+对比窗口               2 7jypvfp14yf0u         966545363 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 a1zhhhp2t202m        3825954357 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 dyjxjvu5ywtbp        3825954357 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 8jzr7tck41dz2         966545363 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 5qpunx2dsag9h         966545363 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 1n7qr48nfk3qd        1835840884 ON CPU               ON CPU                                        JHDBServiceHost.exe                 -                                           1        0.01
+对比窗口               2 624k2t394bhbj        2409661490 ON CPU               ON CPU                                        -                                   -                                           1        0.01
+对比窗口               2 4gx9rcjtg3yag        3149974841 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+对比窗口               2 69qbw65dcxhsw        1835840884 ON CPU               ON CPU                                        JHDBServiceHost.exe                 -                                           1        0.01
+对比窗口               2 0phg1jnxu4twx        3825954357 ON CPU               ON CPU                                        JDBC Thin Client                    -                                           1        0.01
+
+[6] 问题窗口 SQL 相比前一天的增量排序
+--------------------------------------------------------------------------------------------------- prompt 说明：
+prompt - diff_samples 越高，说明该 SQL 在问题窗口比前一天同时间段更活跃。
+prompt - 这部分通常是最关键的定位结果。
+
+
+SQL_ID          PROBLEM_SAMPLES BASE_SAMPLES DIFF_SAMPLES RATIO_TO_BASE TOP_EVENT_PROBLEM
+--------------- --------------- ------------ ------------ ------------- ------------------------------------------------------------
+1qawxag16j7gs                 1            0            1               ON CPU
+59cavh1tsbz13                 1            0            1               direct path read
+27zsk62wt6pnf                 1            0            1               ON CPU
+2y9jyvpyp23ms                 1            0            1               ON CPU
+2zg3326ypsvmb                 1            1            0          1.00 ON CPU
+62umhf847tr7z                 0            1           -1          0.00
+a1tbkqzw5b7kv                 0            1           -1          0.00
+624k2t394bhbj                 0            1           -1          0.00
+5qpunx2dsag9h                 0            1           -1          0.00
+2uf4x99rcst4r                 0            1           -1          0.00
+7jypvfp14yf0u                 0            1           -1          0.00
+1n7qr48nfk3qd                 0            1           -1          0.00
+fgvzaa3w8p5fu                 0            1           -1          0.00
+0z5buv18ybzpz                 0            1           -1          0.00
+a1zhhhp2t202m                 0            1           -1          0.00
+0781cymayfuhb                 0            1           -1          0.00
+dyjxjvu5ywtbp                 0            1           -1          0.00
+c5zzrnnskbp1p                 0            1           -1          0.00
+gz8zm0y93m20c                 0            1           -1          0.00
+6ah0v3pt76bms                 0            1           -1          0.00
+0phg1jnxu4twx                 0            1           -1          0.00
+bjfapa0832b98                 0            1           -1          0.00
+0r5gj49b1mvg8                 0            1           -1          0.00
+d80x71j4wv7wx                 0            1           -1          0.00
+8fznf1uj2srx7                 0            1           -1          0.00
+5nssj2vvwbbh2                 0            1           -1          0.00
+g8g4yjhtay5ya                 0            1           -1          0.00
+1c1zyudc3rssz                 0            1           -1          0.00
+8jzr7tck41dz2                 0            1           -1          0.00
+018zw42v71fvp                 0            1           -1          0.00
+
+[7] Top SQL 文本：查看问题 SQL 的具体内容
+prompt ---------------------------------------------------------------------------------------------------
+
+SQL_ID            SAMPLES SQL_TEXT
+--------------- --------- ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2zg3326ypsvmb           1 select age,total_costs,marital_status ,0 as baby_flag ,CHARGE_TYPE as charge_type,VISIT_DATE as admission_date_time,age as age_discharge,VISIT_DEPT as dept_admission_to , finish_perform_time as  discharge_date_time,HIS_R
+                          EGISTER_PK,'0'as MR_DOCTOR_PART_STATUS,'0' as MR_NURSE_PART_STATUS,'' as MR_REGISTER_DATE from jhoutpat_visit    where patient_id=:ParameterName0 and visit_id=:ParameterName1 and hospital_no=:ParameterName2
+
+27zsk62wt6pnf           1
+59cavh1tsbz13           1
+1qawxag16j7gs           1
+2y9jyvpyp23ms           1
+
+[8] 会话维度：是否集中在某几个用户、机器、程序、模块
+prompt ---------------------------------------------------------------------------------------------------
+
+PERIOD_TYPE     USER_ID USERNAME                  MACHINE                                       PROGRAM                                                 MODULE                                          SAMPLES
+------------ ---------- ------------------------- --------------------------------------------- ------------------------------------------------------- --------------------------------------------- ---------
+问题窗口          131 MEDICOM                   0d6d8064255d                                  JDBC Thin Client                                        JDBC Thin Client                                      3
+问题窗口          122 JHEMR                     WORKGROUP\WIN-3JKD3F5I14R                     DataSynchroTools.exe                                    DataSynchroTools.exe                                  2
+问题窗口          122 JHEMR                     WORKGROUP\WIN-NIRUP875U7P                     JHDBServiceHost.exe                                     JHDBServiceHost.exe                                   1
+问题窗口            0 SYS                       dzbldb2                                       oracle@dzbldb2 (ARC1)                                   -                                                     1
+对比窗口        131 MEDICOM                   localhost.localdomain                         JDBC Thin Client                                        JDBC Thin Client                                     28
+对比窗口        122 JHEMR                     WORKGROUP\WIN-3JKD3F5I14R                     SynchroClient.exe                                       SynchroClient.exe                                     8
+对比窗口        122 JHEMR                     WORKGROUP\WIN-3JKD3F5I14R                     JHDBServiceHost.exe                                     JHDBServiceHost.exe                                   6
+对比窗口        131 MEDICOM                   0d6d8064255d                                  JDBC Thin Client                                        JDBC Thin Client                                      2
+对比窗口          0 SYS                       dzbldb2                                       oracle@dzbldb2 (PSP0)                                   -                                                     1
+对比窗口        130 HLYY                      WIN-IE5M9U2UIV1                               -                                                       -                                                     1
+对比窗口        122 JHEMR                     WIN-NIRUP875U7P                               JDBC Thin Client                                        JDBC Thin Client                                      1
+对比窗口        137 ZGYWMONITOR               localhost.localdomain                         JDBC Thin Client                                        JDBC Thin Client                                      1
+对比窗口        122 JHEMR                     WORKGROUP\WIN-3JKD3F5I14R                     DataSynchroTools.exe                                    DataSynchroTools.exe                                  1
+对比窗口        122 JHEMR                     WORKGROUP\WIN-NIRUP875U7P                     JHDBServiceHost.exe                                     JHDBServiceHost.exe                                   1
+对比窗口          0 SYS                       dzbldb2                                       oracle@dzbldb2 (CKPT)                                   -                                                     1
+
+[9] 阻塞 / 锁等待分析
+prompt --------------------------------------------------------------------------------------------------- prompt 说明：
+prompt - 如果这里有大量记录，重点看 blocking_session、blocking_inst_id、event。
+prompt - 常见问题：enq: TX - row lock contention、library cache lock、cursor pin S wait on X。
+
+
+[10] 热点对象分析：判断是否集中访问某些表/索引
+---------------------------------------------------------------------------------------------------
+
+PERIOD_TYPE  OWNER                     OBJECT_NAME                                   SUBOBJECT_NAME                 OBJECT_TYPE               EVENT                                                     SAMPLES
+------------ ------------------------- --------------------------------------------- ------------------------------ ------------------------- ------------------------------------------------------- ---------
+问题窗口   JHNIS                     JHNIS_INPAT_VITAL_SIGNS                                                      TABLE                     direct path read                                                1
+问题窗口   JHNIS                     JHNIS_INPAT_VITAL_SIGNS                                                      TABLE                     ON CPU                                                          1
+问题窗口   JHFILE                    SYS_LOB0000334538C00010$$                                                    LOB                       ON CPU                                                          1
+对比窗口 JHNIS                     JHNIS_INPAT_VITAL_SIGNS                                                      TABLE                     ON CPU                                                          2
+对比窗口 JHFILE                    SYS_LOB0000334532C00001$$                                                    LOB                       ON CPU                                                          1
+
+[11] RAC 节点分布：判断是否某个节点异常
+prompt ---------------------------------------------------------------------------------------------------
+
+PERIOD_TYPE  INSTANCE_NUMBER    SAMPLES ON_CPU_SAMPLES WAIT_SAMPLES         AAS
+------------ --------------- ---------- -------------- ------------ -----------
+问题窗口                 2          7              6            1        0.08
+对比窗口               2         51             46            5        0.57
+
+[12] GC / RAC 相关等待
+--------------------------------------------------------------------------------------------------- prompt 说明：
+prompt - 如果 gc buffer busy、gc cr request、gc current block busy 明显升高，要看是否 RAC 节点间数据块争用。
+
+
+[13] IO 相关等待
+--------------------------------------------------------------------------------------------------- prompt 说明：
+prompt - db file sequential read：通常是索引单块读。
+prompt - db file scattered read：通常是全表扫描或多块读。
+prompt - direct path read/write：直读、并行、排序、临时段、批处理相关。
+prompt - log file sync / log file parallel write：提交或 redo 写入相关。
+
+
+PERIOD_TYPE  EVENT                                                          SAMPLES
+------------ ------------------------------------------------------------ ---------
+问题窗口   direct path read                                                     1
+对比窗口 control file parallel write                                          1
+
+[14] 临时表空间 / 排序 / HASH 相关 SQL
+---------------------------------------------------------------------------------------------------
+
+[15] SQL 执行计划变化风险：同一个 SQL 是否出现多个 plan_hash_value
+---------------------------------------------------------------------------------------------------
+
+[16] 快照级 SQL 统计：补充逻辑读、物理读、CPU、执行次数
+prompt --------------------------------------------------------------------------------------------------- prompt 说明：
+prompt - 这部分基于 DBA_HIST_SQLSTAT 和 SNAPSHOT，粒度通常比 ASH 粗。
+prompt - 如果 AWR 快照是 1 小时一次，那么这部分不是严格 21:57-22:00，只是辅助判断。
+prompt - 精确短窗口仍以 ASH 为主。
+
+
+PERIOD_TYPE  SQL_ID          PLAN_HASH_VALUE EXECUTIONS_DELTA ELAPSED_SEC_DELTA  CPU_SEC_DELTA BUFFER_GETS_DELTA DISK_READS_DELTA ROWS_PROCESSED_DELTA
+------------ --------------- --------------- ---------------- ----------------- -------------- ----------------- ---------------- --------------------
+问题窗口   czkn29s20v4fc        3965019557               11             92.92           7.62                 0                0               271371
+问题窗口   b6usrg82hwsa3                 0                1             44.64          41.44           8574362            10589                    0
+问题窗口   2zg3326ypsvmb        3356155829               83             34.00          33.89           5788171                0                   83
+问题窗口   1bn9kbcdhvn1z        3965019557               10             23.09           0.58                 0                0                24263
+问题窗口   6mcpb06rctk0x                 0                1             22.06           5.52           1048339            17067                    0
+问题窗口   2p5f1sqkrzazx        3965019557               10             19.92           0.24                 0                0                 9148
+问题窗口   32ja17q3djp3w         666903584               83             16.78          16.72           1059746                0                   83
+问题窗口   2brvj1hcj9z95        3558149369                1             12.74          12.64           6057704                0                   19
+问题窗口   8szmwam7fysa3        2976124318               18             12.06           0.61             36092             8533                  648
+问题窗口   ct1hx13ntxxzc         495761522                1             10.70          10.31           1683465            24716                    7
+问题窗口   aus4g8s5z0n23         495761522                1             10.31           9.92           1684362            24716                   13
+问题窗口   4699vdjuzqks8        1209298318                1             10.31          10.24           6057692                1                   19
+问题窗口   bd2w8nquu76dt        1209298318                1              9.71           9.69           6057811                0                   51
+问题窗口   a2s1wsg5afzjz        1209298318                1              9.63           9.61           6057644                2                    9
+问题窗口   6svnpt1wxxcxc        3326594737                1              9.54           9.47           6058671                4                   11
+问题窗口   ctjkjd3kffpgf        1209298318                1              9.37           9.35           6057605                0                    0
+问题窗口   392wz45g342pw        2990115599                6              9.33           9.30           2926225               12                  264
+问题窗口   75jv29zcvu2ts        1209298318                1              9.18           9.15           6057632                0                    7
+问题窗口   2nw7hc4nqh0ta                 0                7              9.17           9.15           1581975                0                    7
+问题窗口   8835ck9u67yyx        1209298318                1              8.92           8.90           6058456                0                    0
+问题窗口   b8wskykypj37d        3516618889                1              8.56           8.50           6057633                0                    1
+问题窗口   bp199f4k0vk26        3516618889                1              8.32           8.29           6058437                0                    4
+问题窗口   44f64gxrttrjg        3326594737                1              8.12           8.09           6058558                5                    9
+问题窗口   a231xm68vr2vg        1209298318                1              7.98           7.96           6057683                2                    2
+问题窗口   5pay11br0hym6        1209298318                1              7.75           7.71           6057668                3                   13
+问题窗口   atj95vn0ufbw6        1206734291                1              7.58           7.56            563919                0                    9
+问题窗口   cwut61r7k44b4        1928150198                3              7.35           7.33           5692890                0                   66
+问题窗口   0dhajz0sm4rft        2411418663               12              7.02           6.97           1336122                0                43620
+问题窗口   8kb3crpkbt2tq        1254125539                1              6.40           6.38           1065024                0                    1
+问题窗口   cy8rfgtudc4zm        2612047951                1              5.88           2.03            512595           512285                  124
+对比窗口 czkn29s20v4fc        3965019557               20            172.39          13.31                 0                0               493220
+对比窗口 1bn9kbcdhvn1z        3965019557               20             44.69           1.08                 0                0                43697
+对比窗口 2p5f1sqkrzazx        3965019557               20             42.92           0.46                 0                0                18017
+对比窗口 2zg3326ypsvmb        3356155829               57             23.15          23.08           3973186                0                   57
+对比窗口 f8nj81dh063ph        1774212152                4             22.68           2.14            107951            31972                   60
+对比窗口 bfdrcz9hbq76v                 0               10             15.77          15.73           2261676                0                   10
+对比窗口 cwaq0r3b0u1pw        1996206968                4             15.49           2.28            107712            31972                  308
+对比窗口 dup0gg9hh5u61        3558149369                1             12.62          12.59           6055634                0                   22
+对比窗口 32ja17q3djp3w         666903584               56             11.37          11.32            727495                0                   57
+对比窗口 a77bv0yx26bvb        1209298318                1             10.64          10.62           6055594                0                   39
+对比窗口 2uf4x99rcst4r         495761522                1             10.18           9.81           1684310            24703                   11
+对比窗口 d4wczd5kdkjt2        1209298318                1              9.81           9.79           6055557                1                   29
+对比窗口 argkqw9wxx7x6        1209298318                1              9.76           9.73           6055595                1                   46
+对比窗口 392wz45g342pw        2990115599                6              9.55           9.52           2924954               12                  264
+对比窗口 0tka93sud27bj        1209298318                1              9.55           9.52           6055438                0                    4
+对比窗口 f0g2tass18kk9        1209298318                1              9.44           9.37           6056313                0                    7
+对比窗口 1fp7gjw06xb6y        3326594737                1              8.89           8.84           6056702               16                   14
+对比窗口 3a4umkjjpz2s9        1209298318                1              8.64           8.62           6056137                0                    1
+对比窗口 6mcpb06rctk0x                 0                0              8.60           5.65           1253426             2636                    0
+对比窗口 aaxjcybzdh3qb        3516618889                1              8.59           8.56           6056127                1                    2
+对比窗口 bp2wq5xykbkyp        3326594737                1              8.52           8.49           6056527                5                   11
+对比窗口 5tr47h6h1s8c5        1209298318                1              8.35           8.33           6055430                1                    1
+对比窗口 4xvnf47jyhk5t        1209298318                1              8.09           8.06           6055482                1                   11
+对比窗口 g6r70gmarbpb2                 0                4              8.03           8.01            904668                0                    4
+对比窗口 4fcfbzdv9xpnr        3516618889                1              8.01           7.99           6056430                1                    7
+对比窗口 d15b4n6202vn2                 0                4              7.95           7.93            904670                0                    4
+对比窗口 brxbnag9ua8au        1206734291                1              7.95           7.92            564161                0                   16
+对比窗口 c0j3sps4wcvrz        3965019557                1              7.94           0.03                 3                0                 1024
+对比窗口 cwut61r7k44b4         693419896                3              7.27           7.25           5676403                0                   81
+对比窗口 1rjdhrc64t21p        1744402508                1              7.08           6.65            883307            24703                    2
+
+[17] 当前内存 ASH 补查：如果问题刚发生不久，可能还能在 GV$ACTIVE_SESSION_HISTORY 查到
+---------------------------------------------------------------------------------------------------
+
+PERIOD_TYPE  INST_ID EVENT                                                        SQL_ID            SAMPLES
+------------ ------- ------------------------------------------------------------ --------------- ---------
+问题窗口         2 ON CPU                                                                              23
+问题窗口         2 ON CPU                                                       32ja17q3djp3w           6
+问题窗口         2 ON CPU                                                       2zg3326ypsvmb           4
+问题窗口         2 ON CPU                                                       392wz45g342pw           3
+问题窗口         2 SQL*Net message from dblink                                  1jkv5njxbs3f3           3
+问题窗口         2 ON CPU                                                       27zsk62wt6pnf           3
+问题窗口         2 direct path read                                             59cavh1tsbz13           3
+问题窗口         2 ON CPU                                                       btp392km5gnjx           2
+问题窗口         2 control file sequential read                                                         2
+问题窗口         2 direct path read                                             27zsk62wt6pnf           2
+问题窗口         2 ON CPU                                                       59cavh1tsbz13           2
+问题窗口         2 control file parallel write                                                          2
+问题窗口         2 ON CPU                                                       cwut61r7k44b4           2
+问题窗口         2 ON CPU                                                       772s25v1y0x8k           2
+问题窗口         2 ON CPU                                                       8psa87u3a48q2           2
+问题窗口         2 ON CPU                                                       1qawxag16j7gs           2
+问题窗口         2 ON CPU                                                       0dhajz0sm4rft           2
+问题窗口         2 ON CPU                                                       7bgsy627hj3r7           1
+问题窗口         2 ON CPU                                                       3catanpmc9dqx           1
+问题窗口         2 ON CPU                                                       7ahf93fagq98w           1
+问题窗口         2 ON CPU                                                       0gjwz5f1r2dbd           1
+问题窗口         2 ON CPU                                                       535r80ttn6gz4           1
+问题窗口         2 ON CPU                                                       031xgnbm3vgq9           1
+问题窗口         2 ON CPU                                                       0juxc4gwbf2kp           1
+问题窗口         2 ON CPU                                                       bg2atjkby6ywm           1
+问题窗口         2 ON CPU                                                       fhc09tbs86d4d           1
+问题窗口         2 direct path write                                            fnr4v5phhp05u           1
+问题窗口         2 ON CPU                                                       fxbh4hy5np1a0           1
+问题窗口         2 ON CPU                                                       7mz2dgjm9rs87           1
+问题窗口         2 ON CPU                                                       db81u5h6dujbg           1
+对比窗口       2 SQL*Net more data from dblink                                czkn29s20v4fc          25
+对比窗口       2 ON CPU                                                                              22
+对比窗口       2 db file parallel write                                                              15
+对比窗口       2 SQL*Net message from dblink                                  1bn9kbcdhvn1z          11
+对比窗口       2 SQL*Net message from dblink                                  2p5f1sqkrzazx          10
+对比窗口       2 ON CPU                                                       2uf4x99rcst4r          10
+对比窗口       2 SQL*Net message from dblink                                  czkn29s20v4fc           8
+对比窗口       2 ON CPU                                                       czkn29s20v4fc           7
+对比窗口       2 log file sync                                                                        6
+对比窗口       2 db file sequential read                                      f8nj81dh063ph           5
+对比窗口       2 log file parallel write                                                              5
+对比窗口       2 ON CPU                                                       0phg1jnxu4twx           4
+对比窗口       2 ON CPU                                                       bcrsfhxq1hpk4           4
+对比窗口       2 direct path read                                             0z5buv18ybzpz           4
+对比窗口       2 ON CPU                                                       a1zhhhp2t202m           4
+对比窗口       2 LNS wait on SENDREQ                                                                  4
+对比窗口       2 direct path read                                             bjfapa0832b98           4
+对比窗口       2 ON CPU                                                       4r9cv85p66rxk           4
+对比窗口       2 ON CPU                                                       21hjrsaua321d           4
+对比窗口       2 ON CPU                                                       587gbxp8thbcb           4
+对比窗口       2 ON CPU                                                       b2fgrzr144xqu           4
+对比窗口       2 ON CPU                                                       0ztpg1sp4jspq           4
+对比窗口       2 ON CPU                                                       3suuftdhfzx9g           4
+对比窗口       2 ON CPU                                                       c9cw9hg6rfxcx           4
+对比窗口       2 ON CPU                                                       8wt7naucckkuu           4
+对比窗口       2 ON CPU                                                       9fzuf90zvwd68           3
+对比窗口       2 ON CPU                                                       7ky9f73bza2ry           3
+对比窗口       2 ON CPU                                                       4ww85pm1mbv1k           3
+对比窗口       2 ON CPU                                                       5h5xssvkabz4b           3
+对比窗口       2 ON CPU                                                       2j7bn3rxnya8c           3
+
+[18] 自动诊断提示
+---------------------------------------------------------------------------------------------------
+你可以按下面思路解读本报告：
+
+1. 先看 [2]：
+prompt    如果问题窗口 sample_count / AAS 明显高于对比窗口，说明数据库层面确实繁忙。
+prompt
+2. 再看 [4]：
+prompt    如果 ON CPU 高，偏 CPU 或 SQL 执行效率问题。
+prompt    如果 User I/O / System I/O 高，偏存储、SQL物理读、对象热点。
+prompt    如果 Commit 高，重点看 log file sync / log file parallel write。
+prompt    如果 Concurrency 高，重点看 latch、library cache、cursor pin。
+prompt    如果 Application 高，重点看 TX 锁、行锁、业务并发。
+prompt    如果 Cluster 高，重点看 RAC 节点间争用。
+prompt
+3. 再看 [6]：
+prompt    diff_samples 最大的 SQL，就是昨天 21:57-22:00 相比前天同时间段明显增多的 SQL。
+prompt
+4. 再看 [7]：
+prompt    查看 SQL 文本，判断是否为批量任务、报表任务、定时任务、接口任务。
+prompt
+5. 再看 [9]：
+prompt    如果存在 blocking_session，说明可能是锁等待或阻塞链。
+prompt
+6. 再看 [10]：
+prompt    如果热点集中在少数表/索引，说明可能是对象级热点。
+prompt
+7. 再看 [11] 和 [12]：
+prompt    如果某个 RAC 节点异常高，或者 GC 等待高，说明要继续看节点负载、互联、服务分布。
+prompt
+8. 再看 [15]：
+prompt    如果同一 SQL 在问题窗口和对比窗口出现不同 plan_hash_value，要重点检查执行计划漂移。
+prompt
+====================================================================================================
+Report Finished.
+====================================================================================================
